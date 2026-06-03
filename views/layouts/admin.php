@@ -2,101 +2,216 @@
 if (!Auth::check() || !Auth::isAdmin()) {
     header('Location: ' . url('login')); exit;
 }
-$user          = Auth::user();
+$user = Auth::user();
+$cfg  = artcania_config();
 $flash_success = isset($flash_success) ? $flash_success : (Session::getFlash('success') ?: '');
-$flash_error   = isset($flash_error)   ? $flash_error   : (Session::getFlash('error') ?: '');
-$csrf_token    = $_SESSION['csrf_token'] ?? '';
-$current       = ltrim(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), '/');
+$flash_error   = isset($flash_error)   ? $flash_error   : (Session::getFlash('error')   ?: '');
+$uri  = ltrim(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), '/');
+$base = ltrim(parse_url($cfg['url'], PHP_URL_PATH), '/');
+$page = $base ? ltrim(substr($uri, strlen($base)), '/') : $uri;
 ?><!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Administrador – Artcania</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
-<link rel="stylesheet" href="<?= asset('css/main.css') ?>">
-<link rel="stylesheet" href="<?= asset('css/admin.css') ?>">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><?= isset($pageTitle) ? e($pageTitle).' – ' : '' ?>Admin · Artcania</title>
+  <link rel="stylesheet" href="<?= asset('css/bootstrap.min.css') ?>">
+  <link rel="stylesheet" href="<?= asset('css/fontawesome.min.css') ?>">
+  <link rel="stylesheet" href="<?= asset('css/sweetalert2.min.css') ?>">
+  <link rel="stylesheet" href="<?= asset('css/main.css') ?>">
+  <link rel="stylesheet" href="<?= asset('css/admin.css') ?>">
+  <style>
+    body::before, body::after { display:none !important; }
+    .artcania-main {
+      position:relative !important;
+      z-index:10 !important;
+      background: #0a0612 !important;
+      min-height: 100vh;
+    }
+    /* SweetAlert2 tema oscuro artcania */
+    .swal2-popup {
+      background: #16162a !important;
+      border: 1px solid rgba(124,58,237,.3) !important;
+      border-radius: 16px !important;
+      color: #f0eaff !important;
+    }
+    .swal2-title { color: #e8c65a !important; font-family: 'Cinzel', serif !important; }
+    .swal2-html-container { color: #f0eaff !important; }
+    .swal2-confirm {
+      background: linear-gradient(135deg,#7c3aed,#5b21b6) !important;
+      border-radius: 10px !important;
+    }
+    .swal2-cancel {
+      background: rgba(248,113,113,.15) !important;
+      color: #f87171 !important;
+      border: 1px solid rgba(248,113,113,.3) !important;
+      border-radius: 10px !important;
+    }
+    .swal2-icon.swal2-warning { border-color: #e8c65a !important; color: #e8c65a !important; }
+    .swal2-icon.swal2-success { border-color: #34d399 !important; color: #34d399 !important; }
+    .swal2-icon.swal2-error   { border-color: #f87171 !important; color: #f87171 !important; }
+  </style>
 </head>
-<body class="artcania-body">
-<div class="d-flex">
+<body>
 
-  <!-- Sidebar -->
-  <nav class="sidebar-magic d-flex flex-column flex-shrink-0">
-    <a href="<?= url('/') ?>" class="sidebar-brand"><img src="<?= asset('img/logo_artcadia.png') ?>" alt="Artcadia" class="brand-logo-img"><span>ARTCADIA</span></a>
-    <span class="badge mb-3 px-2 py-1 mx-1" style="background:linear-gradient(135deg,rgba(220,53,69,.3),rgba(200,30,50,.2));color:#f8a0a0;border:1px solid rgba(220,53,69,.2);font-size:.68rem;font-family:'Cinzel',serif;width:fit-content">
-      Administrador
-    </span>
-    <ul class="nav flex-column gap-1 flex-grow-1">
-      <li><a href="<?= url('admin/dashboard') ?>" class="nav-link"><i class="fa fa-tachometer-alt me-2"></i>Dashboard</a></li>
-      <li><a href="<?= url('admin/usuarios') ?>" class="nav-link"><i class="fa fa-users me-2"></i>Usuarios</a></li>
-      <li><a href="<?= url('admin/roles') ?>" class="nav-link"><i class="fa fa-user-tag me-2"></i>Roles</a></li>
-      <li><a href="<?= url('admin/artistas') ?>" class="nav-link"><i class="fa fa-palette me-2"></i>Artistas</a></li>
-      <li><a href="<?= url('admin/curadores') ?>" class="nav-link"><i class="fa fa-eye me-2"></i>Curadores</a></li>
-      <li><a href="<?= url('admin/obras') ?>" class="nav-link"><i class="fa fa-images me-2"></i>Obras</a></li>
-      <li><a href="<?= url('admin/subastas') ?>" class="nav-link"><i class="fa fa-gavel me-2"></i>Subastas</a></li>
-      <li><a href="<?= url('admin/exposiciones') ?>" class="nav-link"><i class="fa fa-building me-2"></i>Exposiciones</a></li>
-      <li><a href="<?= url('admin/bitacora') ?>" class="nav-link"><i class="fa fa-list-alt me-2"></i>Bitácora</a></li>
-      <li><a href="<?= url('admin/configuracion') ?>" class="nav-link"><i class="fa fa-cog me-2"></i>Configuración</a></li>
-      <li><a href="<?= url('reporte/bitacora/pdf') ?>" class="nav-link" target="_blank"><i class="fa fa-file-pdf me-2" style="color:#dc3545"></i>PDF Bitácora</a></li>
-      <li><a href="<?= url('reporte/bitacora/excel') ?>" class="nav-link" target="_blank"><i class="fa fa-file-excel me-2" style="color:#5DD6C0"></i>Excel Bitácora</a></li>
-      <li><hr class="divider-magic my-2"></li>
-    </ul>
-    <div class="mt-auto pt-2" style="border-top:1px solid rgba(166,189,255,.08)">
-      <div class="d-flex align-items-center gap-2 px-2 mb-2">
-        <?php if(!empty($user['avatar'])): ?>
-          <img src="<?= media_url('Originales/imagen/Avatares/'.$user['avatar']) ?>"
-               style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid rgba(166,189,255,.2)">
-        <?php else: ?>
-          <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--teal));
-                      display:flex;align-items:center;justify-content:center;font-size:.75rem;color:#fff;font-weight:700">
-            <?= mb_strtoupper(mb_substr($user['nombre']??'A',0,1)) ?>
-          </div>
-        <?php endif; ?>
-        <small style="color:rgba(244,247,251,.5);font-size:.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-          <?= e($user['nombre'] ?? '') ?>
-        </small>
-      </div>
-      <a href="<?= url('logout') ?>" class="nav-link" style="color:rgba(220,53,69,.7);font-size:.82rem">
-        <i class="fa fa-sign-out-alt me-2"></i>Cerrar sesión
-      </a>
-    </div>
+<!-- SIDEBAR -->
+<aside class="artcania-sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="sidebar-brand-text">✦ ARTCANIA</div>
+    <div class="sidebar-subtitle">Panel de Administración</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="sidebar-section-label">Principal</div>
+    <a href="<?= url('admin/dashboard') ?>" class="sidebar-nav-item <?= $page==='admin/dashboard'||$page==='admin'?'active':'' ?>">
+      <i class="fa fa-chart-pie"></i> Dashboard
+    </a>
+    <a href="<?= url('admin/usuarios') ?>" class="sidebar-nav-item <?= strpos($page,'admin/usuarios')===0?'active':'' ?>">
+      <i class="fa fa-users"></i> Usuarios
+    </a>
+    <a href="<?= url('admin/gestion-roles') ?>" class="sidebar-nav-item <?= strpos($page,'admin/gestion-roles')===0?'active':'' ?>">
+      <i class="fa fa-shield-halved"></i> Roles
+    </a>
+
+    <div class="sidebar-section-label">Contenido</div>
+    <a href="<?= url('admin/gestion-artistas') ?>" class="sidebar-nav-item <?= strpos($page,'admin/gestion-artistas')===0?'active':'' ?>">
+      <i class="fa fa-palette"></i> Artistas
+    </a>
+    <a href="<?= url('admin/gestion-curadores') ?>" class="sidebar-nav-item <?= strpos($page,'admin/gestion-curadores')===0?'active':'' ?>">
+      <i class="fa fa-masks-theater"></i> Curadores
+    </a>
+    <a href="<?= url('admin/gestion-obras') ?>" class="sidebar-nav-item <?= strpos($page,'admin/gestion-obras')===0?'active':'' ?>">
+      <i class="fa fa-image"></i> Obras
+    </a>
+    <a href="<?= url('admin/gestion-subastas') ?>" class="sidebar-nav-item <?= strpos($page,'admin/gestion-subastas')===0?'active':'' ?>">
+      <i class="fa fa-gavel"></i> Subastas
+    </a>
+    <a href="<?= url('admin/gestion-fanarts') ?>" class="sidebar-nav-item <?= strpos($page,'admin/gestion-fanarts')===0?'active':'' ?>">
+      <i class="fa fa-star"></i> FanArts
+    </a>
+    <a href="<?= url('admin/gestion-exposiciones') ?>" class="sidebar-nav-item <?= strpos($page,'admin/gestion-exposiciones')===0?'active':'' ?>">
+      <i class="fa fa-landmark"></i> Exposiciones
+    </a>
+
+    <div class="sidebar-section-label">Sistema</div>
+    <a href="<?= url('admin/bitacora') ?>" class="sidebar-nav-item <?= strpos($page,'admin/bitacora')===0?'active':'' ?>">
+      <i class="fa fa-scroll"></i> Logs
+    </a>
+    <a href="<?= url('admin/respaldos') ?>" class="sidebar-nav-item <?= strpos($page,'admin/respaldos')===0?'active':'' ?>">
+      <i class="fa fa-database"></i> Respaldos
+    </a>
+    <a href="<?= url('admin/configuracion') ?>" class="sidebar-nav-item <?= strpos($page,'admin/configuracion')===0?'active':'' ?>">
+      <i class="fa fa-gear"></i> Configuración
+    </a>
+
+    <div class="sidebar-section-label">Mi cuenta</div>
+    <a href="<?= url('perfil') ?>" class="sidebar-nav-item <?= strpos($page,'perfil')===0?'active':'' ?>">
+      <i class="fa fa-user"></i> Mi Perfil
+    </a>
+    <a href="<?= url('notificaciones') ?>" class="sidebar-nav-item <?= strpos($page,'notificaciones')===0?'active':'' ?>">
+      <i class="fa fa-bell"></i> Notificaciones
+    </a>
   </nav>
 
-  <!-- Contenido -->
-  <main class="flex-grow-1 p-4 main-content">
-    <?php if ($flash_success): ?>
-    <div class="alert alert-success alert-dismissible fade show">
-      <i class="fa fa-check-circle me-2"></i><?= e($flash_success) ?>
-      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  <div class="sidebar-footer">
+    <div class="sidebar-user-info">
+      <img src="<?= avatar($user['avatar'] ?? '') ?>" alt="<?= e($user['nombre']) ?>">
+      <div>
+        <div class="user-name"><?= e($user['nombre']) ?></div>
+        <div class="user-role">Administrador</div>
+      </div>
     </div>
-    <?php endif; ?>
-    <?php if ($flash_error): ?>
-    <div class="alert alert-danger alert-dismissible fade show">
-      <i class="fa fa-exclamation-circle me-2"></i><?= e($flash_error) ?>
-      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <a href="<?= url('logout') ?>" class="btn btn-sm w-100 mt-2"
+       style="background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.25);border-radius:10px;font-size:.78rem">
+      <i class="fa fa-right-from-bracket me-1"></i>Cerrar sesión
+    </a>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="artcania-main">
+
+  <!-- Top bar -->
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <button class="btn d-lg-none me-2" id="sidebarToggle"
+            style="background:var(--card-bg);border:1px solid var(--border);color:var(--pearl);border-radius:10px;padding:.4rem .7rem">
+      <i class="fa fa-bars"></i>
+    </button>
+    <div>
+      <?php if($flash_success): ?>
+        <div class="alert-success-magic d-flex align-items-center gap-2 py-2 px-3">
+          <i class="fa fa-circle-check"></i> <?= e($flash_success) ?>
+        </div>
+      <?php endif; ?>
+      <?php if($flash_error): ?>
+        <div class="alert-danger-magic d-flex align-items-center gap-2 py-2 px-3">
+          <i class="fa fa-circle-exclamation"></i> <?= e($flash_error) ?>
+        </div>
+      <?php endif; ?>
     </div>
-    <?php endif; ?>
-    <?= $content ?>
-  </main>
+    <div class="d-flex align-items-center gap-3 ms-auto">
+      <a href="<?= url('') ?>" class="btn btn-sm btn-outline-magic">
+        <i class="fa fa-arrow-up-right-from-square me-1"></i>Ver sitio
+      </a>
+      <img src="<?= avatar($user['avatar'] ?? '') ?>"
+           class="navbar-avatar" style="width:38px;height:38px" alt="">
+    </div>
+  </div>
+
+  <!-- Page content -->
+  <?= $content ?>
+
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
-<script>var BASE_URL = <?= json_encode(rtrim(artcania_config()['url'], '/')) ?>;</script>
+
+<!-- Sidebar overlay mobile -->
+<div class="d-lg-none" id="sidebarOverlay"
+     style="display:none!important;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1019"></div>
+
+<script>var BASE_URL = <?= json_encode(rtrim($cfg['url'], '/')) ?>;</script>
+<script src="<?= asset('js/jquery.min.js') ?>"></script>
+<script src="<?= asset('js/bootstrap.bundle.min.js') ?>"></script>
+<script src="<?= asset('js/sweetalert2.min.js') ?>"></script>
 <script src="<?= asset('js/main.js') ?>"></script>
+<script src="<?= asset('js/admin.js') ?>"></script>
 <script>
-$(document).ready(function() {
-  $('.tabla-dt').DataTable({
-    language: { url: 'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-MX.json' },
-    pageLength: 15, responsive: true, order: [[0, 'desc']]
-  });
+$('#sidebarToggle').on('click', function(){
+  $('#sidebar').toggleClass('show');
+  $('#sidebarOverlay').toggle();
 });
+$('#sidebarOverlay').on('click', function(){
+  $('#sidebar').removeClass('show');
+  $(this).hide();
+});
+
+// Flash messages con SweetAlert2
+<?php if($flash_success): ?>
+Swal.fire({
+  toast: true,
+  position: 'top-end',
+  icon: 'success',
+  title: <?= json_encode($flash_success) ?>,
+  showConfirmButton: false,
+  timer: 3000,
+  timerProgressBar: true,
+  background: '#16162a',
+  color: '#f0eaff',
+  iconColor: '#34d399'
+});
+<?php endif; ?>
+<?php if($flash_error): ?>
+Swal.fire({
+  toast: true,
+  position: 'top-end',
+  icon: 'error',
+  title: <?= json_encode($flash_error) ?>,
+  showConfirmButton: false,
+  timer: 4000,
+  timerProgressBar: true,
+  background: '#16162a',
+  color: '#f0eaff',
+  iconColor: '#f87171'
+});
+<?php endif; ?>
 </script>
-<script src="<?= asset('js/cosmic.js') ?>"></script>
 </body>
 </html>
